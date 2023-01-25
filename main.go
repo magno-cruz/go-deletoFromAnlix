@@ -1,4 +1,4 @@
-package main
+//package main
 
 /*
 import (
@@ -30,7 +30,7 @@ func main() {
 	}
 }
 */
-
+/*
 import (
 	"encoding/json"
 	"fmt"
@@ -74,4 +74,44 @@ func main() {
 		log.Printf("Could not unmarshal json response byte -%v", err)
 	}
 	fmt.Printf(roteador.Message)
+}
+*/
+
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+
+	//"log"
+	"net/http"
+)
+
+func main() {
+	req, err := http.NewRequest(http.MethodGet, "https://app.ccomtelecom.com.br/api/v2/device/update/FHTT94087C20", nil)
+	if err != nil {
+		panic(err)
+	}
+
+	req.SetBasicAuth("magno", "10203040")
+	req.Header.Add("Content-Type", "application/json")
+	req.Close = true
+
+	client := http.Client{}
+	response, err := client.Do(req)
+	if err != nil {
+		panic(err)
+	}
+
+	if response.StatusCode != http.StatusOK {
+		panic("Non 2xx response from server, request" + response.Status)
+	}
+
+	defer response.Body.Close()
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Print(string(body))
 }
