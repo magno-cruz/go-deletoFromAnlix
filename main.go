@@ -80,14 +80,15 @@ func main() {
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"io/ioutil"
-
-	//"log"
+	"io"
+	"log"
 	"net/http"
 )
 
 func main() {
+
 	req, err := http.NewRequest(http.MethodGet, "https://app.ccomtelecom.com.br/api/v2/device/update/FHTT94087C20", nil)
 	if err != nil {
 		panic(err)
@@ -108,10 +109,17 @@ func main() {
 	}
 
 	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Print(string(body))
+	var roteador map[string]interface{}
+
+	if err := json.Unmarshal([]byte(body), &roteador); err != nil {
+		log.Printf("Could not unmarshal json response byte -%v", err)
+	}
+	status := "status_color"
+
+	fmt.Println(roteador[status])
 }
