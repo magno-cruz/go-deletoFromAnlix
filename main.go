@@ -85,41 +85,60 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 )
 
 func main() {
 
-	req, err := http.NewRequest(http.MethodGet, "https://app.ccomtelecom.com.br/api/v2/device/update/FHTT94087C20", nil)
+	for _, id := range mac() {
+		fmt.Printf("Mac %v\n", id)
+
+		var roteador map[string]interface{}
+
+		req, err := http.NewRequest(http.MethodGet, "https://app.ccomtelecom.com.br/api/v2/device/update/"+id+"/", nil)
+		checkNilError(err)
+		req.SetBasicAuth("magno", "10203040")
+		req.Header.Add("Content-Type", "application/json")
+		req.Close = true
+
+		client := http.Client{}
+		response, err := client.Do(req)
+		checkNilError(err)
+
+		if response.StatusCode != http.StatusOK {
+			panic("Non 2xx response from server, request" + response.Status + "\n")
+		}
+
+		defer response.Body.Close()
+		body, err := io.ReadAll(response.Body)
+		checkNilError(err)
+
+		if err := json.Unmarshal([]byte(body), &roteador); err != nil {
+			log.Printf("Could not unmarshal json response byte -%v\n", err)
+		}
+		if roteador["online_status"] == true {
+			fmt.Print(roteador["pppoe_user"])
+			fmt.Printf(" - Cliente online. Não pode excluir.\n")
+		} else {
+			fmt.Print(roteador["pppoe_user"])
+			fmt.Printf(" - Cliente offline. Pode excluir.\n")
+		}
+	}
+
+}
+
+func checkNilError(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
 
-	req.SetBasicAuth("magno", "10203040")
-	req.Header.Add("Content-Type", "application/json")
-	req.Close = true
+func mac() []string {
+	macsList, err := os.ReadFile("macs.txt")
+	checkNilError(err)
+	macs := string(macsList[:])
 
-	client := http.Client{}
-	response, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
-
-	if response.StatusCode != http.StatusOK {
-		panic("Non 2xx response from server, request" + response.Status)
-	}
-
-	defer response.Body.Close()
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		panic(err)
-	}
-
-	var roteador map[string]interface{}
-
-	if err := json.Unmarshal([]byte(body), &roteador); err != nil {
-		log.Printf("Could not unmarshal json response byte -%v", err)
-	}
-	status := "status_color"
-
-	fmt.Println(roteador[status])
+	mac := strings.Fields(macs)
+	return mac
 }
