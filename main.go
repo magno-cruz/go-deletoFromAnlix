@@ -1,82 +1,3 @@
-//package main
-
-/*
-import (
-	"fmt"
-	"io"
-	"net/http"
-)
-
-func main() {
-	//url := "https://app.ccomtelecom.com.br/api/v2/device/update"
-	//response, err := http.Get(url)
-
-	//req, _ := http.NewRequest("GET", "https://app.ccomtelecom.com.br/api/v2/device/update/", nil)
-	//req.SetBasicAuth("magno", "102030")
-
-	request, err := http.NewRequest(http.MethodGet, "https://app.ccomtelecom.com.br/api/v2/device/update/FHTT94087C20", nil)
-
-	request.SetBasicAuth("magno", "10203040")
-
-	if err != nil {
-		fmt.Printf("There was an error from the API request %s", err.Error())
-	} else {
-		responseData, err := io.ReadAll(request.Body)
-		if err != nil {
-			fmt.Printf("There was an error from parsing the request body %s", err.Error())
-		} else {
-			fmt.Sprint(string(responseData))
-		}
-	}
-}
-*/
-/*
-import (
-	"encoding/json"
-	"fmt"
-	"io"
-	"log"
-	"net/http"
-)
-
-type Roteador struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-	//Type    string `json:"type"`
-}
-
-func main() {
-	request, err := http.NewRequest(http.MethodGet, "https://app.ccomtelecom.com.br/api/v2/device/update/FHTT94087C20", nil)
-
-	//request.SetBasicAuth("magno", "10203040")
-
-	if err != nil {
-		log.Printf("Could not prepare a new request %v", err)
-	}
-
-	request.Header.Add("content-type", "application/json")
-	request.Header.Add("Authorization", "Basic bWFnbm86MTAyMDMwNDA=")
-
-	client := http.Client{}
-	response, err := client.Do(request)
-	if err != nil {
-		log.Printf("Could not prepare a new request %v", err)
-	}
-
-	responseBytes, err := io.ReadAll(response.Body)
-	if err != nil {
-		log.Printf("Could not read response body %v", err)
-	}
-
-	var roteador Roteador
-	fmt.Printf(string(responseBytes))
-	if err := json.Unmarshal([]byte(responseBytes), &roteador); err != nil {
-		log.Printf("Could not unmarshal json response byte -%v", err)
-	}
-	fmt.Printf(roteador.Message)
-}
-*/
-
 package main
 
 import (
@@ -89,14 +10,14 @@ import (
 	"strings"
 )
 
-func main() {
+var device map[string]interface{}
 
+func main() {
+	quantExcluidos := 0
 	for _, id := range mac() {
 		fmt.Printf("Mac %v\n", id)
 
-		var roteador map[string]interface{}
-
-		req, err := http.NewRequest(http.MethodGet, "https://app.ccomtelecom.com.br/api/v2/device/update/"+id+"/", nil)
+		req, err := http.NewRequest("GET", "https://app.ccomtelecom.com.br/api/v2/device/update/"+id+"/", nil)
 		checkNilError(err)
 		req.SetBasicAuth("magno", "10203040")
 		req.Header.Add("Content-Type", "application/json")
@@ -114,17 +35,31 @@ func main() {
 		body, err := io.ReadAll(response.Body)
 		checkNilError(err)
 
-		if err := json.Unmarshal([]byte(body), &roteador); err != nil {
+		if err := json.Unmarshal([]byte(body), &device); err != nil {
 			log.Printf("Could not unmarshal json response byte -%v\n", err)
 		}
-		if roteador["online_status"] == true {
-			fmt.Print(roteador["pppoe_user"])
-			fmt.Printf(" - Cliente online. Não pode excluir.\n")
+		if checkStatus() {
+			fmt.Printf("%v está online. Não foi excluído.\n", id)
+
 		} else {
-			fmt.Print(roteador["pppoe_user"])
-			fmt.Printf(" - Cliente offline. Pode excluir.\n")
+			req, err := http.NewRequest("DELETE", "https://app.ccomtelecom.com.br/api/v2/device/delete/"+id+"/", nil)
+			checkNilError(err)
+			req.SetBasicAuth("magno", "10203040")
+			req.Header.Add("Content-Type", "application/json")
+			req.Close = true
+
+			client := http.Client{}
+			response, err := client.Do(req)
+			checkNilError(err)
+
+			if response.StatusCode != http.StatusOK {
+				panic("Non 2xx response from server, request" + response.Status + "\n")
+			}
+			fmt.Printf("%v foi excluído.\n", id)
 		}
+		quantExcluidos++
 	}
+	fmt.Printf("Foram excluídos %v aparelhos.\n", quantExcluidos)
 
 }
 
@@ -135,10 +70,18 @@ func checkNilError(err error) {
 }
 
 func mac() []string {
-	macsList, err := os.ReadFile("macs.txt")
+	macsList, err := os.ReadFile("excluir do anlix.txt")
 	checkNilError(err)
 	macs := string(macsList[:])
 
 	mac := strings.Fields(macs)
 	return mac
+}
+
+func checkStatus() bool {
+	if device["online_status"] == true {
+		return true
+	} else {
+		return false
+	}
 }
